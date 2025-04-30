@@ -1,0 +1,7 @@
+[
+{
+  "name":"org.tinystruct.system.Dispatcher",
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"open","parameterTypes":[] }]
+}
+]
