@@ -1,22 +1,15 @@
 package org.tinystruct.mcp;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.tinystruct.ApplicationException;
 import org.tinystruct.data.component.Builder;
-import org.tinystruct.http.Request;
-import org.tinystruct.http.Response;
-import org.tinystruct.http.ResponseStatus;
 import org.tinystruct.system.annotation.Action;
+import org.tinystruct.system.annotation.Argument;
 
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static org.tinystruct.mcp.MCPSpecification.*;
 
 /**
  * GitHub-specific MCP Application that extends the base MCP functionality
@@ -41,7 +34,7 @@ public class GitHub extends MCPServerApplication {
         super.init();
 
         // Register GitHub tool methods as individual tools
-        GitHubTool githubTool = new GitHubTool("github", "GitHub Tool", new Builder(), null);
+        GitHubTool githubTool = new GitHubTool();
         this.registerToolMethods(githubTool);
 
         // Register a sample prompt (can be customized for GitHub context)
@@ -85,148 +78,173 @@ public class GitHub extends MCPServerApplication {
         private static final Logger LOGGER = Logger.getLogger(GitHubTool.class.getName());
         private static final String DEFAULT_CLONE_DIR = "cloned-repos";
 
-        public GitHubTool(String name, String description, Builder schema, MCPClient client) {
-            super(name, description, schema, client);
-        }
-
-        public GitHubTool(String name, String description, Builder schema, MCPClient client, boolean supportsLocalExecution) {
-            super(name, description, schema, client, supportsLocalExecution);
-        }
-
-        @Override
-        public String getName() {
-            return "github";
-        }
-
-        @Override
-        public String getDescription() {
-            return "Tool for performing Git and GitHub operations";
+        /**
+         * Constructs a new GitHubTool with local execution support.
+         */
+        public GitHubTool() {
+            // Note the true parameter at the end to enable local execution
+            super("github", "Tool for performing Git and GitHub operations");
         }
 
         /**
-         * Returns the schema for the GitHub tool, describing all supported operations and parameters.
+         * Constructs a new GitHubTool with a client.
+         *
+         * @param client The MCP client
          */
-        @Override
-        public Builder getSchema() {
-            Builder schema = new Builder();
-            Builder properties = new Builder();
-
-            // Operation parameter (required)
-            Builder operation = new Builder();
-            operation.put("type", "string");
-            operation.put("description", "The operation to perform (clone, pull, push, status, issues, prs, actions)");
-            operation.put("enum", new String[]{"clone", "pull", "push", "status", "issues", "prs", "actions"});
-
-            // Repository parameter (required for most operations)
-            Builder repository = new Builder();
-            repository.put("type", "string");
-            repository.put("description", "The repository URL or path (for git operations) or owner/repo (for GitHub API operations)");
-
-            // Branch parameter (optional)
-            Builder branch = new Builder();
-            branch.put("type", "string");
-            branch.put("description", "The branch name (optional, defaults to 'main')");
-
-            // Token parameter (required for GitHub API operations)
-            Builder token = new Builder();
-            token.put("type", "string");
-            token.put("description", "GitHub API token for authentication (required for issues, prs, actions)");
-
-            // State parameter (optional for issues/prs)
-            Builder state = new Builder();
-            state.put("type", "string");
-            state.put("description", "State of issues or PRs (open, closed, all)");
-            state.put("enum", new String[]{"open", "closed", "all"});
-
-            // Remote parameter (optional for push)
-            Builder remote = new Builder();
-            remote.put("type", "string");
-            remote.put("description", "Remote name for push operation (optional, defaults to 'origin')");
-
-            // Target path parameter (optional for clone)
-            Builder targetPath = new Builder();
-            targetPath.put("type", "string");
-            targetPath.put("description", "Target path for clone operation (optional)");
-
-            // Add all parameters to properties
-            properties.put("operation", operation);
-            properties.put("repository", repository);
-            properties.put("branch", branch);
-            properties.put("token", token);
-            properties.put("state", state);
-            properties.put("remote", remote);
-            properties.put("target_path", targetPath);
-
-            schema.put("type", "object");
-            schema.put("properties", properties);
-            schema.put("required", new String[]{"operation", "repository"});
-
-            return schema;
+        public GitHubTool(MCPClient client) {
+            // Note the true parameter at the end to enable local execution
+            super("github", "Tool for performing Git and GitHub operations", null, client, true);
         }
 
+
+
         /**
-         * Executes the requested Git or GitHub operation.
-         * Throws MCPException for missing/invalid parameters or unsupported operations.
+         * Clones a Git repository.
+         * @param repository The repository URL
+         * @param branch The branch to clone (optional, defaults to 'main')
+         * @param targetPath The target path for cloning (optional)
+         * @return The result of the clone operation
+         * @throws MCPException If cloning fails
          */
-        @Override
-        public Object execute(Builder params) throws MCPException {
-            if (params == null || !params.containsKey("operation") || !params.containsKey("repository")) {
-                throw new MCPException("Missing required parameters: operation and repository");
-            }
-
-            String operation = params.get("operation").toString();
-            String repository = params.get("repository").toString();
-            String branch = params.containsKey("branch") ? params.get("branch").toString() : "main";
-
-            LOGGER.info("Executing GitHub tool with operation: " + operation + " on repository: " + repository);
-
+        @Action(value = "github/clone", description = "Clone a Git repository", arguments = {
+                @Argument(key = "repository", description = "The repository URL", type = "string"),
+                @Argument(key = "branch", description = "The branch to clone", type = "string"),
+                @Argument(key = "target_path", description = "The target path for cloning", type = "string")
+        })
+        public Builder cloneRepository(String repository, String branch, String targetPath) throws MCPException {
             try {
-                switch (operation) {
-                    case "clone":
-                        // target_path is optional
-                        return cloneRepository(repository, branch, params.containsKey("target_path") ? params.get("target_path").toString() : null);
-                    case "pull":
-                        return pullRepository(repository, branch);
-                    case "push":
-                        return pushRepository(
-                            repository,
-                            params.containsKey("remote") ? params.get("remote").toString() : "origin",
-                            branch
-                        );
-                    case "status":
-                        return getRepositoryStatus(repository);
-                    case "issues":
-                        if (!params.containsKey("token")) {
-                            throw new MCPException("Missing required parameter: token for issues operation");
-                        }
-                        String issuesToken = params.get("token").toString();
-                        String issuesState = params.containsKey("state") ? params.get("state").toString() : "open";
-                        return getGitHubIssues(repository, issuesToken, issuesState);
-                    case "prs":
-                        if (!params.containsKey("token")) {
-                            throw new MCPException("Missing required parameter: token for prs operation");
-                        }
-                        String prsToken = params.get("token").toString();
-                        String prsState = params.containsKey("state") ? params.get("state").toString() : "open";
-                        return getGitHubPullRequests(repository, prsToken, prsState);
-                    case "actions":
-                        if (!params.containsKey("token")) {
-                            throw new MCPException("Missing required parameter: token for actions operation");
-                        }
-                        String actionsToken = params.get("token").toString();
-                        return getGitHubActions(repository, actionsToken);
-                    default:
-                        throw new MCPException("Unsupported operation: " + operation);
-                }
-            } catch (MCPException e) {
-                throw e;
+                return cloneRepositoryInternal(repository, branch != null ? branch : "main", targetPath);
             } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "Error executing GitHub tool: " + e.getMessage(), e);
-                throw new MCPException("Error executing GitHub tool: " + e.getMessage());
+                LOGGER.log(Level.SEVERE, "Error cloning repository: " + e.getMessage(), e);
+                throw new MCPException("Error cloning repository: " + e.getMessage());
             }
         }
 
-        private Builder cloneRepository(String repository, String branch, String targetPath) throws Exception {
+        /**
+         * Pulls changes from a Git repository.
+         * @param repositoryPath The path to the local repository
+         * @param branch The branch to pull from (optional, defaults to 'main')
+         * @return The result of the pull operation
+         * @throws MCPException If pulling fails
+         */
+        @Action(value = "github/pull", description = "Pull changes from a Git repository", arguments = {
+                @Argument(key = "repository", description = "The path to the local repository", type = "string"),
+                @Argument(key = "branch", description = "The branch to pull from", type = "string")
+        })
+        public Builder pullRepository(String repositoryPath, String branch) throws MCPException {
+            try {
+                return pullRepositoryInternal(repositoryPath, branch != null ? branch : "main");
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error pulling repository: " + e.getMessage(), e);
+                throw new MCPException("Error pulling repository: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Pushes changes to a Git repository.
+         * @param repositoryPath The path to the local repository
+         * @param remote The remote name (optional, defaults to 'origin')
+         * @param branch The branch to push (optional, defaults to 'main')
+         * @return The result of the push operation
+         * @throws MCPException If pushing fails
+         */
+        @Action(value = "github/push", description = "Push changes to a Git repository", arguments = {
+                @Argument(key = "repository", description = "The path to the local repository", type = "string"),
+                @Argument(key = "remote", description = "The remote name", type = "string"),
+                @Argument(key = "branch", description = "The branch to push", type = "string")
+        })
+        public Builder pushRepository(String repositoryPath, String remote, String branch) throws MCPException {
+            try {
+                return pushRepositoryInternal(repositoryPath, remote != null ? remote : "origin", branch != null ? branch : "main");
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error pushing repository: " + e.getMessage(), e);
+                throw new MCPException("Error pushing repository: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Gets the status of a Git repository.
+         * @param repositoryPath The path to the local repository
+         * @return The repository status
+         * @throws MCPException If getting status fails
+         */
+        @Action(value = "github/status", description = "Get the status of a Git repository", arguments = {
+                @Argument(key = "repository", description = "The path to the local repository", type = "string")
+        })
+        public Builder getRepositoryStatus(String repositoryPath) throws MCPException {
+            try {
+                return getRepositoryStatusInternal(repositoryPath);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error getting repository status: " + e.getMessage(), e);
+                throw new MCPException("Error getting repository status: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Gets GitHub issues for a repository.
+         * @param repository The repository in format 'owner/repo'
+         * @param token The GitHub API token
+         * @param state The state of issues (open, closed, all)
+         * @return The issues data
+         * @throws MCPException If fetching issues fails
+         */
+        @Action(value = "github/issues", description = "Get GitHub issues for a repository", arguments = {
+                @Argument(key = "repository", description = "The repository in format 'owner/repo'", type = "string"),
+                @Argument(key = "token", description = "The GitHub API token", type = "string"),
+                @Argument(key = "state", description = "The state of issues", type = "string")
+        })
+        public Builder getGitHubIssues(String repository, String token, String state) throws MCPException {
+            try {
+                return getGitHubIssuesInternal(repository, token, state != null ? state : "open");
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error fetching GitHub issues: " + e.getMessage(), e);
+                throw new MCPException("Error fetching GitHub issues: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Gets GitHub pull requests for a repository.
+         * @param repository The repository in format 'owner/repo'
+         * @param token The GitHub API token
+         * @param state The state of PRs (open, closed, all)
+         * @return The pull requests data
+         * @throws MCPException If fetching PRs fails
+         */
+        @Action(value = "github/prs", description = "Get GitHub pull requests for a repository", arguments = {
+                @Argument(key = "repository", description = "The repository in format 'owner/repo'", type = "string"),
+                @Argument(key = "token", description = "The GitHub API token", type = "string"),
+                @Argument(key = "state", description = "The state of PRs", type = "string")
+        })
+        public Builder getGitHubPullRequests(String repository, String token, String state) throws MCPException {
+            try {
+                return getGitHubPullRequestsInternal(repository, token, state != null ? state : "open");
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error fetching GitHub pull requests: " + e.getMessage(), e);
+                throw new MCPException("Error fetching GitHub pull requests: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Gets GitHub Actions workflows for a repository.
+         * @param repository The repository in format 'owner/repo'
+         * @param token The GitHub API token
+         * @return The workflows data
+         * @throws MCPException If fetching workflows fails
+         */
+        @Action(value = "github/actions", description = "Get GitHub Actions workflows for a repository", arguments = {
+                @Argument(key = "repository", description = "The repository in format 'owner/repo'", type = "string"),
+                @Argument(key = "token", description = "The GitHub API token", type = "string")
+        })
+        public Builder getGitHubActions(String repository, String token) throws MCPException {
+            try {
+                return getGitHubActionsInternal(repository, token);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error fetching GitHub Actions workflows: " + e.getMessage(), e);
+                throw new MCPException("Error fetching GitHub Actions workflows: " + e.getMessage());
+            }
+        }
+
+        private Builder cloneRepositoryInternal(String repository, String branch, String targetPath) throws Exception {
             // Determine target path
             Path finalTargetPath;
             if (targetPath != null) {
@@ -269,7 +287,7 @@ public class GitHub extends MCPServerApplication {
             return responseResult;
         }
 
-        private Builder pullRepository(String repositoryPath, String branch) throws Exception {
+        private Builder pullRepositoryInternal(String repositoryPath, String branch) throws Exception {
             File gitDir = new File(repositoryPath);
             if (!gitDir.exists() || !new File(gitDir, ".git").exists()) {
                 throw new MCPException("Not a valid git repository: " + repositoryPath);
@@ -300,7 +318,7 @@ public class GitHub extends MCPServerApplication {
             return responseResult;
         }
 
-        private Builder pushRepository(String repositoryPath, String remote, String branch) throws Exception {
+        private Builder pushRepositoryInternal(String repositoryPath, String remote, String branch) throws Exception {
             File gitDir = new File(repositoryPath);
             if (!gitDir.exists() || !new File(gitDir, ".git").exists()) {
                 throw new MCPException("Not a valid git repository: " + repositoryPath);
@@ -345,7 +363,7 @@ public class GitHub extends MCPServerApplication {
             return responseResult;
         }
 
-        private Builder getRepositoryStatus(String repositoryPath) throws Exception {
+        private Builder getRepositoryStatusInternal(String repositoryPath) throws Exception {
             File gitDir = new File(repositoryPath);
             if (!gitDir.exists() || !new File(gitDir, ".git").exists()) {
                 throw new MCPException("Not a valid git repository: " + repositoryPath);
@@ -421,7 +439,7 @@ public class GitHub extends MCPServerApplication {
             return responseResult;
         }
 
-        protected Builder getGitHubIssues(String repository, String token, String state) throws MCPException {
+        protected Builder getGitHubIssuesInternal(String repository, String token, String state) throws MCPException {
             try {
                 // Format: owner/repo
                 String[] repoParts = repository.split("/");
@@ -479,7 +497,7 @@ public class GitHub extends MCPServerApplication {
             }
         }
 
-        protected Builder getGitHubPullRequests(String repository, String token, String state) throws MCPException {
+        protected Builder getGitHubPullRequestsInternal(String repository, String token, String state) throws MCPException {
             try {
                 // Format: owner/repo
                 String[] repoParts = repository.split("/");
@@ -537,7 +555,7 @@ public class GitHub extends MCPServerApplication {
             }
         }
 
-        protected Builder getGitHubActions(String repository, String token) throws MCPException {
+        protected Builder getGitHubActionsInternal(String repository, String token) throws MCPException {
             try {
                 // Format: owner/repo
                 String[] repoParts = repository.split("/");

@@ -1,11 +1,8 @@
 package org.tinystruct.mcp;
 
-import org.tinystruct.ApplicationException;
 import org.tinystruct.data.component.Builder;
-import org.tinystruct.http.Request;
-import org.tinystruct.http.Response;
-import org.tinystruct.http.ResponseStatus;
 import org.tinystruct.system.annotation.Action;
+import org.tinystruct.system.annotation.Argument;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,34 +12,18 @@ import java.util.Base64;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.tinystruct.mcp.MCPSpecification.ErrorCodes;
-import static org.tinystruct.mcp.MCPSpecification.Http;
-
 // Reference: see GitHub.java and SampleMCPServerApplication.java for the modern MCPServerApplication pattern
 public class FileSystem extends MCPServerApplication {
-    private static final Logger LOGGER = Logger.getLogger(FileSystem.class.getName());
 
     // FileSystem MCP specific constants
     private static final String FILESYSTEM_PROTOCOL_VERSION = "1.0.0";
-    private static final String[] FILESYSTEM_FEATURES = {
-            "base", "lifecycle", "resources", "filesystem",
-            "fs.list", "fs.read", "fs.write", "fs.copy",
-            "fs.move", "fs.delete", "fs.info", "fs.mkdir"
-    };
-
-    // SSE Event Types
-    private static final String EVENT_FILE_CREATED = "file_created";
-    private static final String EVENT_FILE_DELETED = "file_deleted";
-    private static final String EVENT_FILE_MODIFIED = "file_modified";
-    private static final String EVENT_DIRECTORY_CREATED = "directory_created";
-    private static final String EVENT_DIRECTORY_DELETED = "directory_deleted";
 
     @Override
     public void init() {
         super.init();
 
         // Register FileSystem tool methods as individual tools
-        FileSystemTool fsTool = new FileSystemTool("filesystem", "File System Tool", new Builder(), null);
+        FileSystemTool fsTool = new FileSystemTool();
         this.registerToolMethods(fsTool);
 
         // Register a sample prompt (can be customized for FileSystem context)
@@ -85,156 +66,217 @@ public class FileSystem extends MCPServerApplication {
     public static class FileSystemTool extends MCPTool {
         private static final Logger LOGGER = Logger.getLogger(FileSystemTool.class.getName());
 
-        public FileSystemTool(String name, String description, Builder schema, MCPClient client) {
-            super(name, description, schema, client);
+        /**
+         * Constructs a new FileSystemTool with local execution support.
+         */
+        public FileSystemTool() {
+            // Note the true parameter at the end to enable local execution
+            super("filesystem", "Tool for performing file system operations");
         }
 
-        public FileSystemTool(String name, String description, Builder schema, MCPClient client, boolean supportsLocalExecution) {
-            super(name, description, schema, client, supportsLocalExecution);
+        /**
+         * Constructs a new FileSystemTool with a client.
+         *
+         * @param client The MCP client
+         */
+        public FileSystemTool(MCPClient client) {
+            // Note the true parameter at the end to enable local execution
+            super("filesystem", "Tool for performing file system operations", null, client, true);
         }
 
-        @Override
-        public String getName() {
-            return "filesystem";
-        }
-
-        @Override
-        public String getDescription() {
-            return "Tool for performing file system operations";
-        }
-
-        @Override
-        public Builder getSchema() {
-            Builder schema = new Builder();
-            Builder properties = new Builder();
-
-            // Operation parameter
-            Builder operation = new Builder();
-            operation.put("type", "string");
-            operation.put("description", "The operation to perform (info, exists, size, list, read, write, copy, move, delete, mkdir)");
-            operation.put("enum", new String[]{"info", "exists", "size", "list", "read", "write", "copy", "move", "delete", "mkdir"});
-
-            // Path parameter
-            Builder path = new Builder();
-            path.put("type", "string");
-            path.put("description", "The file or directory path");
-
-            // Content parameter for write operation
-            Builder content = new Builder();
-            content.put("type", "string");
-            content.put("description", "The content to write to the file");
-
-            // Encoding parameter
-            Builder encoding = new Builder();
-            encoding.put("type", "string");
-            encoding.put("description", "The encoding to use (utf8 or base64)");
-            encoding.put("enum", new String[]{"utf8", "base64"});
-
-            // Append parameter for write operation
-            Builder append = new Builder();
-            append.put("type", "boolean");
-            append.put("description", "Whether to append to the file or overwrite it");
-
-            // Source parameter for copy/move operations
-            Builder source = new Builder();
-            source.put("type", "string");
-            source.put("description", "The source file or directory path");
-
-            // Destination parameter for copy/move operations
-            Builder destination = new Builder();
-            destination.put("type", "string");
-            destination.put("description", "The destination file or directory path");
-
-            // Overwrite parameter for copy/move operations
-            Builder overwrite = new Builder();
-            overwrite.put("type", "boolean");
-            overwrite.put("description", "Whether to overwrite existing files");
-
-            // Recursive parameter for delete operation
-            Builder recursive = new Builder();
-            recursive.put("type", "boolean");
-            recursive.put("description", "Whether to delete directories recursively");
-
-            properties.put("operation", operation);
-            properties.put("path", path);
-            properties.put("content", content);
-            properties.put("encoding", encoding);
-            properties.put("append", append);
-            properties.put("source", source);
-            properties.put("destination", destination);
-            properties.put("overwrite", overwrite);
-            properties.put("recursive", recursive);
-
-            schema.put("type", "object");
-            schema.put("properties", properties);
-            schema.put("required", new String[]{"operation", "path"});
-
-            return schema;
-        }
-
-        @Override
-        public Object execute(Builder params) throws MCPException {
-            if (params == null || !params.containsKey("operation") || !params.containsKey("path")) {
-                throw new MCPException("Missing required parameters: operation and path");
-            }
-
-            String operation = params.get("operation").toString();
-            String path = params.get("path").toString();
-
-            LOGGER.info("Executing filesystem tool with operation: " + operation + " on path: " + path);
-
+        /**
+         * Gets information about a file or directory.
+         * @param path The file or directory path
+         * @return File information
+         * @throws MCPException If getting info fails
+         */
+        @Action(value = "filesystem/info", description = "Get information about a file or directory", arguments = {
+                @Argument(key = "path", description = "The file or directory path", type = "string")
+        })
+        public Builder getFileInfo(String path) throws MCPException {
             try {
-                switch (operation) {
-                    case "info":
-                        return getFileInfo(path);
-                    case "exists":
-                        return checkFileExists(path);
-                    case "size":
-                        return getFileSize(path);
-                    case "list":
-                        return listDirectory(path);
-                    case "read":
-                        String readEncoding = params.containsKey("encoding") ? params.get("encoding").toString() : "utf8";
-                        return readFile(path, readEncoding);
-                    case "write":
-                        if (!params.containsKey("content")) {
-                            throw new MCPException("Missing required parameter: content");
-                        }
-                        String content = params.get("content").toString();
-                        String writeEncoding = params.containsKey("encoding") ? params.get("encoding").toString() : "utf8";
-                        boolean append = params.containsKey("append") && Boolean.parseBoolean(params.get("append").toString());
-                        return writeFile(path, content, writeEncoding, append);
-                    case "copy":
-                        if (!params.containsKey("source") || !params.containsKey("destination")) {
-                            throw new MCPException("Missing required parameters: source and destination");
-                        }
-                        String source = params.get("source").toString();
-                        String destination = params.get("destination").toString();
-                        boolean copyOverwrite = params.containsKey("overwrite") && Boolean.parseBoolean(params.get("overwrite").toString());
-                        return copyFile(source, destination, copyOverwrite);
-                    case "move":
-                        if (!params.containsKey("source") || !params.containsKey("destination")) {
-                            throw new MCPException("Missing required parameters: source and destination");
-                        }
-                        String moveSource = params.get("source").toString();
-                        String moveDestination = params.get("destination").toString();
-                        boolean moveOverwrite = params.containsKey("overwrite") && Boolean.parseBoolean(params.get("overwrite").toString());
-                        return moveFile(moveSource, moveDestination, moveOverwrite);
-                    case "delete":
-                        boolean recursive = params.containsKey("recursive") && Boolean.parseBoolean(params.get("recursive").toString());
-                        return deleteFile(path, recursive);
-                    case "mkdir":
-                        return createDirectory(path);
-                    default:
-                        throw new MCPException("Unsupported operation: " + operation);
-                }
+                return getFileInfoInternal(path);
             } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "Error executing filesystem tool: " + e.getMessage(), e);
-                throw new MCPException("Error executing filesystem tool: " + e.getMessage());
+                LOGGER.log(Level.SEVERE, "Error getting file info: " + e.getMessage(), e);
+                throw new MCPException("Error getting file info: " + e.getMessage());
             }
         }
 
-        private Builder getFileInfo(String path) throws Exception {
+        /**
+         * Checks if a file or directory exists.
+         * @param path The file or directory path
+         * @return Existence status
+         */
+        @Action(value = "filesystem/exists", description = "Check if a file or directory exists", arguments = {
+                @Argument(key = "path", description = "The file or directory path", type = "string")
+        })
+        public Builder checkFileExists(String path) {
+            return checkFileExistsInternal(path);
+        }
+
+        /**
+         * Gets the size of a file.
+         * @param path The file path
+         * @return File size information
+         * @throws MCPException If getting size fails
+         */
+        @Action(value = "filesystem/size", description = "Get the size of a file", arguments = {
+                @Argument(key = "path", description = "The file path", type = "string")
+        })
+        public Builder getFileSize(String path) throws MCPException {
+            try {
+                return getFileSizeInternal(path);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error getting file size: " + e.getMessage(), e);
+                throw new MCPException("Error getting file size: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Lists the contents of a directory.
+         * @param path The directory path
+         * @return Directory contents
+         * @throws MCPException If listing fails
+         */
+        @Action(value = "filesystem/list", description = "List the contents of a directory", arguments = {
+                @Argument(key = "path", description = "The directory path", type = "string")
+        })
+        public Builder listDirectory(String path) throws MCPException {
+            try {
+                return listDirectoryInternal(path);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error listing directory: " + e.getMessage(), e);
+                throw new MCPException("Error listing directory: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Reads the contents of a file.
+         * @param path The file path
+         * @param encoding The encoding to use (utf8 or base64)
+         * @return File contents
+         * @throws MCPException If reading fails
+         */
+        @Action(value = "filesystem/read", description = "Read the contents of a file", arguments = {
+                @Argument(key = "path", description = "The file path", type = "string"),
+                @Argument(key = "encoding", description = "The encoding to use", type = "string")
+        })
+        public Builder readFile(String path, String encoding) throws MCPException {
+            try {
+                return readFileInternal(path, encoding != null ? encoding : "utf8");
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error reading file: " + e.getMessage(), e);
+                throw new MCPException("Error reading file: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Writes content to a file.
+         * @param path The file path
+         * @param content The content to write
+         * @param encoding The encoding to use (utf8 or base64)
+         * @param append Whether to append to the file or overwrite it
+         * @return Write operation result
+         * @throws MCPException If writing fails
+         */
+        @Action(value = "filesystem/write", description = "Write content to a file", arguments = {
+                @Argument(key = "path", description = "The file path", type = "string"),
+                @Argument(key = "content", description = "The content to write", type = "string"),
+                @Argument(key = "encoding", description = "The encoding to use", type = "string"),
+                @Argument(key = "append", description = "Whether to append to the file", type = "boolean")
+        })
+        public Builder writeFile(String path, String content, String encoding, boolean append) throws MCPException {
+            try {
+                return writeFileInternal(path, content, encoding != null ? encoding : "utf8", append);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error writing file: " + e.getMessage(), e);
+                throw new MCPException("Error writing file: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Copies a file or directory.
+         * @param source The source path
+         * @param destination The destination path
+         * @param overwrite Whether to overwrite existing files
+         * @return Copy operation result
+         * @throws MCPException If copying fails
+         */
+        @Action(value = "filesystem/copy", description = "Copy a file or directory", arguments = {
+                @Argument(key = "source", description = "The source path", type = "string"),
+                @Argument(key = "destination", description = "The destination path", type = "string"),
+                @Argument(key = "overwrite", description = "Whether to overwrite existing files", type = "boolean")
+        })
+        public Builder copyFile(String source, String destination, boolean overwrite) throws MCPException {
+            try {
+                return copyFileInternal(source, destination, overwrite);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error copying file: " + e.getMessage(), e);
+                throw new MCPException("Error copying file: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Moves a file or directory.
+         * @param source The source path
+         * @param destination The destination path
+         * @param overwrite Whether to overwrite existing files
+         * @return Move operation result
+         * @throws MCPException If moving fails
+         */
+        @Action(value = "filesystem/move", description = "Move a file or directory", arguments = {
+                @Argument(key = "source", description = "The source path", type = "string"),
+                @Argument(key = "destination", description = "The destination path", type = "string"),
+                @Argument(key = "overwrite", description = "Whether to overwrite existing files", type = "boolean")
+        })
+        public Builder moveFile(String source, String destination, boolean overwrite) throws MCPException {
+            try {
+                return moveFileInternal(source, destination, overwrite);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error moving file: " + e.getMessage(), e);
+                throw new MCPException("Error moving file: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Deletes a file or directory.
+         * @param path The file or directory path
+         * @param recursive Whether to delete directories recursively
+         * @return Delete operation result
+         * @throws MCPException If deletion fails
+         */
+        @Action(value = "filesystem/delete", description = "Delete a file or directory", arguments = {
+                @Argument(key = "path", description = "The file or directory path", type = "string"),
+                @Argument(key = "recursive", description = "Whether to delete directories recursively", type = "boolean")
+        })
+        public Builder deleteFile(String path, boolean recursive) throws MCPException {
+            try {
+                return deleteFileInternal(path, recursive);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error deleting file: " + e.getMessage(), e);
+                throw new MCPException("Error deleting file: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Creates a directory.
+         * @param path The directory path
+         * @return Directory creation result
+         * @throws MCPException If creation fails
+         */
+        @Action(value = "filesystem/mkdir", description = "Create a directory", arguments = {
+                @Argument(key = "path", description = "The directory path", type = "string")
+        })
+        public Builder createDirectory(String path) throws MCPException {
+            try {
+                return createDirectoryInternal(path);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error creating directory: " + e.getMessage(), e);
+                throw new MCPException("Error creating directory: " + e.getMessage());
+            }
+        }
+
+        private Builder getFileInfoInternal(String path) throws Exception {
             File file = new File(path);
             if (!file.exists()) {
                 throw new MCPException("File does not exist: " + path);
@@ -261,7 +303,7 @@ public class FileSystem extends MCPServerApplication {
             return info;
         }
 
-        private Builder checkFileExists(String path) {
+        private Builder checkFileExistsInternal(String path) {
             File file = new File(path);
             Builder result = new Builder();
             result.put("path", path);
@@ -273,7 +315,7 @@ public class FileSystem extends MCPServerApplication {
             return result;
         }
 
-        private Builder getFileSize(String path) throws MCPException {
+        private Builder getFileSizeInternal(String path) throws MCPException {
             File file = new File(path);
             if (!file.exists()) {
                 throw new MCPException("File does not exist: " + path);
@@ -287,7 +329,7 @@ public class FileSystem extends MCPServerApplication {
             return result;
         }
 
-        private Builder listDirectory(String path) throws MCPException {
+        private Builder listDirectoryInternal(String path) throws MCPException {
             File directory = new File(path);
             if (!directory.exists()) {
                 throw new MCPException("Directory does not exist: " + path);
@@ -322,7 +364,7 @@ public class FileSystem extends MCPServerApplication {
             return result;
         }
 
-        private Builder readFile(String path, String encoding) throws MCPException {
+        private Builder readFileInternal(String path, String encoding) throws MCPException {
             try {
                 File file = new File(path);
                 if (!file.exists()) {
@@ -359,7 +401,7 @@ public class FileSystem extends MCPServerApplication {
             }
         }
 
-        private Builder writeFile(String path, String content, String encoding, boolean append) throws MCPException {
+        private Builder writeFileInternal(String path, String content, String encoding, boolean append) throws MCPException {
             try {
                 File file = new File(path);
 
@@ -398,7 +440,7 @@ public class FileSystem extends MCPServerApplication {
             }
         }
 
-        private Builder copyFile(String source, String destination, boolean overwrite) throws MCPException {
+        private Builder copyFileInternal(String source, String destination, boolean overwrite) throws MCPException {
             try {
                 Path sourcePath = Paths.get(source);
                 Path destPath = Paths.get(destination);
@@ -437,7 +479,7 @@ public class FileSystem extends MCPServerApplication {
             }
         }
 
-        private Builder moveFile(String source, String destination, boolean overwrite) throws MCPException {
+        private Builder moveFileInternal(String source, String destination, boolean overwrite) throws MCPException {
             try {
                 Path sourcePath = Paths.get(source);
                 Path destPath = Paths.get(destination);
@@ -476,7 +518,7 @@ public class FileSystem extends MCPServerApplication {
             }
         }
 
-        private Builder deleteFile(String path, boolean recursive) throws MCPException {
+        private Builder deleteFileInternal(String path, boolean recursive) throws MCPException {
             try {
                 Path filePath = Paths.get(path);
 
@@ -509,7 +551,7 @@ public class FileSystem extends MCPServerApplication {
             }
         }
 
-        private Builder createDirectory(String path) throws MCPException {
+        private Builder createDirectoryInternal(String path) throws MCPException {
             try {
                 Path dirPath = Paths.get(path);
 
