@@ -1,6 +1,6 @@
 ﻿# tinystruct mcp
 
-**tinystruct-mcp** is a modular Java MCP server framework based on Tinystruct, providing built-in tools for file system and GitHub operations via the Model Context Protocol (MCP). It's designed for easy integration, automation, and extensibility in modern DevOps and AI-driven workflows.
+**tinystruct-mcp** is a modular Java MCP server module based on tinystruct framework, providing built-in tools for file system and GitHub operations via the Model Context Protocol (MCP) as an example. It's designed for easy integration, automation, and extensibility in modern DevOps and AI-driven workflows.
 
 ---
 
@@ -86,4 +86,5 @@ To learn how to develop your own MCP tools and extend the server, see [DEVELOPIN
 
 
 **MCP stands for Model Context Protocol.**
+
 
