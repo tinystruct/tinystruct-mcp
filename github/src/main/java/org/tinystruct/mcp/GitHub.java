@@ -96,8 +96,6 @@ public class GitHub extends MCPServerApplication {
             super("github", "Tool for performing Git and GitHub operations", null, client, true);
         }
 
-
-
         /**
          * Clones a Git repository.
          * @param repository The repository URL
