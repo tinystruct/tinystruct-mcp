@@ -12,11 +12,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * GitHub-specific MCP Application that extends the base MCP functionality
+ * GitHub-specific MCP that extends the base MCP functionality
  * Implements Git and GitHub operations for repository management with SSE support
  */
 // Reference: https://github.com/tinystruct/tinystruct/blob/master/src/main/java/org/tinystruct/mcp/MCPServerApplication.java
-public class GitHub extends MCPServerApplication {
+public class GitHub extends MCPServer {
     private static final Logger LOGGER = Logger.getLogger(GitHub.class.getName());
 
     // GitHub MCP specific constants
@@ -35,7 +35,7 @@ public class GitHub extends MCPServerApplication {
 
         // Register GitHub tool methods as individual tools
         GitHubTool githubTool = new GitHubTool();
-        this.registerToolMethods(githubTool);
+        this.registerTool(githubTool);
 
         // Register a sample prompt (can be customized for GitHub context)
         Builder promptSchema = new Builder();

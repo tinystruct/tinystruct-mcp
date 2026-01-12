@@ -13,7 +13,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 // Reference: see GitHub.java and SampleMCPServerApplication.java for the modern MCPServerApplication pattern
-public class FileSystem extends MCPServerApplication {
+public class FileSystem extends MCPServer {
 
     // FileSystem MCP specific constants
     private static final String FILESYSTEM_PROTOCOL_VERSION = "1.0.0";
@@ -24,7 +24,7 @@ public class FileSystem extends MCPServerApplication {
 
         // Register FileSystem tool methods as individual tools
         FileSystemTool fsTool = new FileSystemTool();
-        this.registerToolMethods(fsTool);
+        this.registerTool(fsTool);
 
         // Register a sample prompt (can be customized for FileSystem context)
         Builder promptSchema = new Builder();
