@@ -6,7 +6,7 @@ This project is designed to bridge the gap between Large Language Models (LLMs) 
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
 *   **Modular Architecture**: Built with Maven, allowing for easy expansion and isolation of tool sets.
 *   **Annotation-Driven**: Simplify tool development using `@Action` and `@Argument` annotations for automatic schema generation.
@@ -16,7 +16,7 @@ This project is designed to bridge the gap between Large Language Models (LLMs) 
 
 ---
 
-## 🏗 Project Structure
+## Project Structure
 
 The project is organized into submodules, each representing a specific domain of tools:
 
@@ -26,7 +26,7 @@ The project is organized into submodules, each representing a specific domain of
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -88,7 +88,7 @@ public class Main {
 
 ---
 
-## 🛠 Built-in Tools
+## Built-in Tools
 
 ### GitHub Tool (`github/`)
 | Action | Description |
@@ -116,7 +116,7 @@ public class Main {
 
 ---
 
-## 👩‍💻 Developing Your Own Tools
+## Developing Your Own Tools
 
 Creating new MCP tools is straightforward. Simply extend the `MCPTool` class and annotate your methods.
 
@@ -133,8 +133,9 @@ For a detailed guide on creating custom tools, check out [**DEVELOPING_TOOLS.md*
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
 
 **Note**: *MCP stands for Model Context Protocol.*
+
