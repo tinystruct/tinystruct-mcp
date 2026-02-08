@@ -1,208 +1,148 @@
-# Developing MCP Tools for tinystruct-mcp
+# Developing MCP Tools with tinystruct
 
-This guide explains how to extend the tinystruct-mcp server by developing your own MCP tools using the modern `@Action` annotation pattern.
+This guide providing step-by-step instructions on how to extend the **tinystruct-mcp** server by developing your own custom MCP tools using the annotation-driven pattern.
 
 ---
 
-## 1. Create a Custom Tool
+## 🏗 Understanding the Architecture
 
-To add new functionality, create a class that extends `MCPTool` and use `@Action` annotations for each operation:
+A tinystruct MCP implementation typically consists of two main components:
+1.  **`MCPTool`**: A class (often an inner class) that defines the actual operations (actions) using `@Action` and `@Argument` annotations.
+2.  **`MCPServer`**: The main application class that handles initialization and registration of tools and prompts.
+
+---
+
+## 🛠 1. Create a Custom Tool
+
+Extend the `MCPTool` class and define your operations. Each method annotated with `@Action` becomes a tool available to the AI.
 
 ```java
 import org.tinystruct.mcp.MCPTool;
-import org.tinystruct.data.component.Builder;
 import org.tinystruct.system.annotation.Action;
 import org.tinystruct.system.annotation.Argument;
+import java.util.logging.Logger;
 
-public class EchoTool extends MCPTool {
-    
-    /**
-     * Constructs a new EchoTool with local execution support.
-     */
-    public EchoTool() {
-        // Note the true parameter at the end to enable local execution
-        super("echo", "A tool that echoes back input");
+public class WeatherTool extends MCPTool {
+    private static final Logger LOGGER = Logger.getLogger(WeatherTool.class.getName());
+
+    public WeatherTool() {
+        // Initialize with tool name and description
+        super("weather", "A tool for retrieving weather information");
     }
 
-    /**
-     * Constructs a new EchoTool with a client.
-     *
-     * @param client The MCP client
-     */
-    public EchoTool(MCPClient client) {
-        // Note the true parameter at the end to enable local execution
-        super("echo", "A tool that echoes back input", null, client, true);
-    }
-
-    /**
-     * Echoes back the input message.
-     * @param message The message to echo
-     * @return The echoed message
-     */
-    @Action(value = "echo/message", description = "Echo back the input message", arguments = {
-            @Argument(key = "message", description = "The message to echo", type = "string")
+    @Action(value = "weather/get", description = "Get current weather for a city", arguments = {
+            @Argument(key = "city", description = "The name of the city", type = "string"),
+            @Argument(key = "unit", description = "Temperature unit (celsius/fahrenheit)", type = "string")
     })
-    public String echoMessage(String message) {
-        return message;
-    }
-
-    /**
-     * Echoes back the input with a prefix.
-     * @param message The message to echo
-     * @param prefix The prefix to add
-     * @return The prefixed message
-     */
-    @Action(value = "echo/with-prefix", description = "Echo back the input with a prefix", arguments = {
-            @Argument(key = "message", description = "The message to echo", type = "string"),
-            @Argument(key = "prefix", description = "The prefix to add", type = "string")
-    })
-    public String echoWithPrefix(String message, String prefix) {
-        return prefix + ": " + message;
+    public String getWeather(String city, String unit) {
+        LOGGER.info("Fetching weather for " + city + " in " + unit);
+        // Implement your logic here
+        return "The weather in " + city + " is sunny, 25° " + (unit.equals("fahrenheit") ? "F" : "C");
     }
 }
 ```
 
 ---
 
-## 2. Register Your Tool in the Server
+## 🔌 2. Register the Tool in the Server
 
-In your server class (extending `MCPServerApplication`), register your tool in the `init()` method:
+To make your tool active, you must register it within an `MCPServer` implementation's `init()` method.
 
 ```java
-public class MyMCPServer extends MCPServerApplication {
+import org.tinystruct.mcp.MCPServer;
+
+public class MyMCPServer extends MCPServer {
     @Override
     public void init() {
         super.init();
-        this.registerToolMethods(new EchoTool());
-        // Register other tools or prompts as needed
+
+        // Register your custom tool
+        this.registerTool(new WeatherTool());
+        
+        // Optionally register other tools or prompts
     }
 }
 ```
 
 ---
 
-## 3. Key Features of Modern MCP Tools
+## 🚀 3. Start Your Server
 
-### Constructor Pattern
-- **Default constructor**: `super("tool-name", "Tool description")` enables local execution
-- **Client constructor**: `super("tool-name", "Tool description", null, client, true)` for client-based execution
+Once your tool is registered, you can start your server using the dispatcher.
 
-### @Action Annotations
-- **Automatic schema generation**: No need to manually build schemas
-- **Method-based operations**: Each `@Action` method becomes a separate tool operation
-- **Parameter validation**: `@Argument` annotations define parameter types and descriptions
+### Using the Dispatcher (Recommended)
 
-### Automatic Features
-- **Name and description**: Set in constructor, no need to override `getName()` or `getDescription()`
-- **Schema generation**: Built automatically from `@Action` and `@Argument` annotations
-- **Local execution**: Enabled by default for better performance
+After compiling your project, use the `bin/dispatcher` script to load your server class:
 
----
+```sh
+# On Linux/macOS
+bin/dispatcher start --import org.tinystruct.system.HttpServer --import com.yourpackage.MyMCPServer --server-port 777
 
-## 4. Add Custom Prompts (Optional)
-
-You can also register prompts for user interaction or automation:
-
-```java
-Builder promptSchema = new Builder();
-Builder properties = new Builder();
-Builder nameParam = new Builder();
-nameParam.put("type", "string");
-nameParam.put("description", "The name to greet");
-properties.put("name", nameParam);
-promptSchema.put("type", "object");
-promptSchema.put("properties", properties);
-promptSchema.put("required", new String[]{"name"});
-
-MCPPrompt greetingPrompt = new MCPPrompt(
-    "greeting",
-    "A greeting prompt",
-    "Hello, {{name}}!",
-    promptSchema,
-    null
-) {
-    @Override
-    protected boolean supportsLocalExecution() { return true; }
-};
-this.registerPrompt(greetingPrompt);
+# On Windows
+bin\dispatcher.cmd start --import org.tinystruct.system.HttpServer --import com.yourpackage.MyMCPServer --server-port 777
 ```
 
 ---
 
-## 5. Best Practices
+## 📝 4. Defining Arguments and Schemas
 
-### Tool Design
-- **Single responsibility**: Each tool should focus on one domain (e.g., file operations, Git operations)
-- **Consistent naming**: Use `tool-name/operation` format for action values
-- **Clear descriptions**: Provide helpful descriptions for tools and arguments
-- **Error handling**: Wrap internal operations in try-catch blocks
+The `@Argument` annotation is crucial as it automatically generates the JSON schema required by the Model Context Protocol.
 
-### Method Structure
+### Supported Types:
+*   **`string`**: For text values.
+*   **`number`**: For integers, doubles, and floats.
+*   **`boolean`**: For true/false values.
+*   **`object`**: For complex data structures (use `org.tinystruct.data.component.Builder`).
+
+### Example with Complex Objects:
 ```java
-@Action(value = "tool/operation", description = "What this operation does", arguments = {
-        @Argument(key = "param1", description = "Description of param1", type = "string"),
-        @Argument(key = "param2", description = "Description of param2", type = "number")
+@Action(value = "data/process", description = "Process complex data", arguments = {
+        @Argument(key = "payload", description = "The JSON payload", type = "object")
 })
-public ReturnType operationName(String param1, int param2) throws MCPException {
-    try {
-        // Implementation logic here
-        return result;
-    } catch (Exception e) {
-        LOGGER.log(Level.SEVERE, "Error in operation: " + e.getMessage(), e);
-        throw new MCPException("Error in operation: " + e.getMessage());
-    }
+public Builder processData(Builder payload) {
+    // Logic to process the Builder object
+    return payload;
 }
 ```
 
-### Parameter Types
-- **string**: Text values
-- **number**: Numeric values (int, double, etc.)
-- **boolean**: True/false values
-- **object**: Complex objects (use Builder)
+---
+
+## 💡 Best Practices
+
+1.  **Namespacing**: Use the `toolname/action` format for `value` in `@Action` (e.g., `github/clone`).
+2.  **Clear Descriptions**: Provide detailed descriptions for both tools and arguments; these are used by the LLM to understand when and how to call your tool.
+3.  **Local Execution**: The tinystruct MCP implementation supports local execution by default. Ensure your tool methods are thread-safe.
+4.  **Error Handling**: Wrap your logic in try-catch blocks and throw `MCPException` for errors that should be reported back to the LLM.
+5.  **Logging**: Use `java.util.logging` to provide visibility into tool execution on the server side.
 
 ---
 
-## 6. Recommended Workflow
-
-1. **Extend `MCPServerApplication`** and implement the `init()` method
-2. **Create tool class** extending `MCPTool` with proper constructors
-3. **Add `@Action` methods** for each operation with `@Argument` annotations
-4. **Register tools** using `registerToolMethods()` in `init()`
-5. **Optionally register prompts** for user interaction
-6. **Start the server** via Java or CLI
-7. **Configure** via properties or `Settings`
-
----
-
-## 7. Example: Complete Calculator Tool
+## 🎯 Complete Example: Calculator
 
 ```java
-public class CalculatorTool extends MCPTool {
-    
-    public CalculatorTool() {
-        super("calculator", "A calculator that performs arithmetic operations");
+public class Calculator extends MCPServer {
+    @Override
+    public void init() {
+        super.init();
+        this.registerTool(new CalcTool());
     }
 
-    public CalculatorTool(MCPClient client) {
-        super("calculator", "A calculator that performs arithmetic operations", null, client, true);
-    }
+    public static class CalcTool extends MCPTool {
+        public CalcTool() {
+            super("calc", "Basic arithmetic operations");
+        }
 
-    @Action(value = "calculator/add", description = "Add two numbers", arguments = {
-            @Argument(key = "a", description = "The first operand", type = "number"),
-            @Argument(key = "b", description = "The second operand", type = "number")
-    })
-    public double add(double a, double b) {
-        return a + b;
-    }
-
-    @Action(value = "calculator/multiply", description = "Multiply two numbers", arguments = {
-            @Argument(key = "a", description = "The first operand", type = "number"),
-            @Argument(key = "b", description = "The second operand", type = "number")
-    })
-    public double multiply(double a, double b) {
-        return a * b;
+        @Action(value = "calc/add", description = "Add two numbers", arguments = {
+                @Argument(key = "a", description = "First number", type = "number"),
+                @Argument(key = "b", description = "Second number", type = "number")
+        })
+        public double add(double a, double b) {
+            return a + b;
+        }
     }
 }
 ```
 
-**MCP stands for Model Context Protocol.** 
+---
+
+**Note**: *MCP stands for Model Context Protocol.*

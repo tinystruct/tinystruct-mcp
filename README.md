@@ -1,90 +1,140 @@
-﻿# tinystruct mcp
+﻿# Tinystruct MCP Project
 
-**tinystruct-mcp** is a modular Java MCP server module based on tinystruct framework, providing built-in tools for file system and GitHub operations via the Model Context Protocol (MCP) as an example. It's designed for easy integration, automation, and extensibility in modern DevOps and AI-driven workflows.
+**Tinystruct MCP** is a demonstration project that showcases how to develop [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tools using the [Tinystruct framework](https://www.tinystruct.org). It provides a modular Java-based MCP server with built-in tools for file system management and GitHub operations.
+
+This project is designed to bridge the gap between Large Language Models (LLMs) and external systems, enabling AI agents to interact with the physical file system and version control systems securely and efficiently.
 
 ---
 
-## Quick Start
+## 🌟 Key Features
 
-### 1. Start the MCP Server
+*   **Modular Architecture**: Built with Maven, allowing for easy expansion and isolation of tool sets.
+*   **Annotation-Driven**: Simplify tool development using `@Action` and `@Argument` annotations for automatic schema generation.
+*   **Ready-to-Use Tools**: Includes robust implementations for Git, GitHub API, and local FileSystem operations.
+*   **Extensible Design**: Inherits the flexibility of the Tinystruct framework for building high-performance Java applications.
+*   **Standardized Communication**: Uses `org.tinystruct.data.component.Builder` for consistent JSON-based interaction.
 
-#### Java (Programmatic Startup)
+---
+
+## 🏗 Project Structure
+
+The project is organized into submodules, each representing a specific domain of tools:
+
+*   **`github/`**: Implements Git operations (clone, pull, push, status) and GitHub API integrations (issues, PRs, actions).
+*   **`filesystem/`**: Provides comprehensive local file system management (read, write, copy, move, delete, list).
+*   **`bin/`**: Contains scripts for server management and dispatching commands.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+*   Java 17 or higher
+*   Maven 3.8+
+
+### 1. Build the Project
+
+Clone the repository and build the modules using Maven:
+
+```sh
+git clone https://github.com/tinystruct/tinystruct-mcp.git
+cd tinystruct-mcp
+mvn clean install
+```
+
+### 2. Start the MCP Server
+
+You can start the server programmatically or via the command line.
+
+#### Command Line (CLI)
+
+Use the `bin/dispatcher` (for Linux/macOS) or `bin/dispatcher.cmd` (for Windows) script to start the server:
+
+```sh
+# On Linux / macOS
+bin/dispatcher start --import org.tinystruct.system.HttpServer --import org.tinystruct.mcp.GitHub --import org.tinystruct.mcp.FileSystem --server-port 777
+
+# On Windows
+bin\dispatcher.cmd start --import org.tinystruct.system.HttpServer --import org.tinystruct.mcp.GitHub --import org.tinystruct.mcp.FileSystem --server-port 777
+```
+
+#### Programmatic Startup (Java)
+
+Include the following in your `Main` class to boot the server with integrated tools:
 
 ```java
 import org.tinystruct.ApplicationContext;
 import org.tinystruct.application.Context;
 import org.tinystruct.system.ApplicationManager;
-import org.tinystruct.system.Settings;
 import org.tinystruct.system.HttpServer;
+import org.tinystruct.mcp.GitHub;
+import org.tinystruct.mcp.FileSystem;
 
 public class Main {
     public static void main(String[] args) {
         Context ctx = new ApplicationContext();
-        ctx.setAttribute("--server-port", "8080");
+        ctx.setAttribute("--server-port", "777");
+        
         ApplicationManager.init();
-        ApplicationManager.install(new org.tinystruct.mcp.GitHub());
-        ApplicationManager.install(new org.tinystruct.mcp.FileSystem());
+        ApplicationManager.install(new GitHub());
+        ApplicationManager.install(new FileSystem());
         ApplicationManager.install(new HttpServer());
+        
         ApplicationManager.call("start", ctx);
     }
 }
 ```
 
-#### CLI (Recommended for Most Users)
+---
 
-If you have the `bin/dispatcher` script (from the Tinystruct distribution), you can start the server directly from the command line:
+## 🛠 Built-in Tools
 
-To start the server with the built-in GitHub and FileSystem modules:
-```sh
-bin/dispatcher start --import org.tinystruct.system.HttpServer --import org.tinystruct.mcp.GitHub --import org.tinystruct.mcp.FileSystem --server-port 777 
-```
-- You can add or remove imports to customize which modules and tools are loaded.
+### GitHub Tool (`github/`)
+| Action | Description |
+| :--- | :--- |
+| `github/clone` | Clone a Git repository |
+| `github/pull` | Pull changes from a remote repository |
+| `github/push` | Push changes to a remote repository |
+| `github/status` | Get the current status of a local repository |
+| `github/issues` | Fetch GitHub issues for a repository |
+| `github/prs` | Fetch GitHub pull requests |
+| `github/actions` | List GitHub Actions workflows |
+
+### FileSystem Tool (`filesystem/`)
+| Action | Description |
+| :--- | :--- |
+| `filesystem/info` | Get metadata about a file or directory |
+| `filesystem/exists` | Check if a path exists |
+| `filesystem/read` | Read contents of a file (UTF-8 or Base64) |
+| `filesystem/write` | Write content to a file (overwrite or append) |
+| `filesystem/list` | List items in a directory |
+| `filesystem/copy` | Copy a file or directory |
+| `filesystem/move` | Move or rename a file or directory |
+| `filesystem/delete` | Delete a file or directory (recursive support) |
+| `filesystem/mkdir` | Create a new directory |
 
 ---
 
-## Built-in Tools
+## 👩‍💻 Developing Your Own Tools
 
-### GitHub Tool
-Provides Git and GitHub API operations:
-- **Clone repositories**: `github/clone`
-- **Pull changes**: `github/pull` 
-- **Push changes**: `github/push`
-- **Check status**: `github/status`
-- **Get issues**: `github/issues`
-- **Get pull requests**: `github/prs`
-- **Get workflows**: `github/actions`
+Creating new MCP tools is straightforward. Simply extend the `MCPTool` class and annotate your methods.
 
-### FileSystem Tool
-Provides file system operations:
-- **Get file info**: `filesystem/info`
-- **Check existence**: `filesystem/exists`
-- **Get file size**: `filesystem/size`
-- **List directory**: `filesystem/list`
-- **Read file**: `filesystem/read`
-- **Write file**: `filesystem/write`
-- **Copy file**: `filesystem/copy`
-- **Move file**: `filesystem/move`
-- **Delete file**: `filesystem/delete`
-- **Create directory**: `filesystem/mkdir`
-
----
-
-## Configuration
-
-Configure the server using a properties file or by setting values in the `Settings` object:
-
-```properties
-# Example: mcp.properties
-mcp.auth.token=your-secret-token
+```java
+@Action(value = "mytool/greet", description = "Greet a user", arguments = {
+    @Argument(key = "name", description = "User's name", type = "string")
+})
+public String greet(String name) {
+    return "Hello, " + name + "!";
+}
 ```
 
+For a detailed guide on creating custom tools, check out [**DEVELOPING_TOOLS.md**](DEVELOPING_TOOLS.md).
+
 ---
 
-## More Advanced Usage
+## 📄 License
 
-To learn how to develop your own MCP tools and extend the server, see [DEVELOPING_TOOLS.md](DEVELOPING_TOOLS.md).
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
 
-
-**MCP stands for Model Context Protocol.**
-
-
+**Note**: *MCP stands for Model Context Protocol.*
