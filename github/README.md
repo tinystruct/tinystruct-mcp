@@ -22,7 +22,7 @@ The GitHub Plugin is a tinystruct-based extension that provides seamless integra
 ### Prerequisites
 
 - Java 8 or higher
-- Tinystruct framework
+- tinystruct framework
 - Maven
 
 ### Adding to Your Project
@@ -49,7 +49,7 @@ The GitHub Plugin is a tinystruct-based extension that provides seamless integra
 
 ## Configuration
 
-The plugin automatically creates a default directory named `cloned-repos` for storing cloned repositories. You can integrate the plugin with your Tinystruct application by adding it to your application configuration.
+The plugin automatically creates a default directory named `cloned-repos` for storing cloned repositories. You can integrate the plugin with your tinystruct application by adding it to your application configuration.
 
 ## Usage
 
@@ -204,9 +204,9 @@ The plugin follows the JSON-RPC 2.0 specification for error handling:
 }
 ```
 
-## Integration with Tinystruct
+## Integration with tinystruct
 
-This plugin extends the `MCPApplication` class from the Tinystruct framework, making it compatible with the standard Tinystruct application lifecycle and configuration system.
+This plugin extends the `MCPApplication` class from the tinystruct framework, making it compatible with the standard tinystruct application lifecycle and configuration system.
 
 ## Development
 

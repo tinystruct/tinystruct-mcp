@@ -1,6 +1,6 @@
-﻿# Tinystruct MCP Project
+﻿# tinystruct MCP project
 
-**Tinystruct MCP** is a demonstration project that showcases how to develop [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tools using the [Tinystruct framework](https://www.tinystruct.org). It provides a modular Java-based MCP server with built-in tools for file system management and GitHub operations.
+**tinystruct MCP** is a demonstration project that showcases how to develop [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tools using the [tinystruct framework](https://www.tinystruct.org). It provides a modular Java-based MCP server with built-in tools for file system management and GitHub operations.
 
 This project is designed to bridge the gap between Large Language Models (LLMs) and external systems, enabling AI agents to interact with the physical file system and version control systems securely and efficiently.
 
@@ -11,7 +11,7 @@ This project is designed to bridge the gap between Large Language Models (LLMs) 
 *   **Modular Architecture**: Built with Maven, allowing for easy expansion and isolation of tool sets.
 *   **Annotation-Driven**: Simplify tool development using `@Action` and `@Argument` annotations for automatic schema generation.
 *   **Ready-to-Use Tools**: Includes robust implementations for Git, GitHub API, and local FileSystem operations.
-*   **Extensible Design**: Inherits the flexibility of the Tinystruct framework for building high-performance Java applications.
+*   **Extensible Design**: Inherits the flexibility of the tinystruct framework for building high-performance Java applications.
 *   **Standardized Communication**: Uses `org.tinystruct.data.component.Builder` for consistent JSON-based interaction.
 
 ---
