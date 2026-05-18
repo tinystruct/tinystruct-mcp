@@ -37,23 +37,28 @@ public class GitHub extends MCPServer {
         GitHubTool githubTool = new GitHubTool();
         this.registerTool(githubTool);
 
-        // Register a sample prompt (can be customized for GitHub context)
+        // Register git-commit-helper prompt for GitHub context
         Builder promptSchema = new Builder();
         Builder properties = new Builder();
 
-        Builder nameParam = new Builder();
-        nameParam.put("type", "string");
-        nameParam.put("description", "The name to greet");
+        Builder statusParam = new Builder();
+        statusParam.put("type", "string");
+        statusParam.put("description", "The output of git status");
 
-        properties.put("name", nameParam);
+        Builder diffParam = new Builder();
+        diffParam.put("type", "string");
+        diffParam.put("description", "The output of git diff");
+
+        properties.put("status", statusParam);
+        properties.put("diff", diffParam);
         promptSchema.put("type", "object");
         promptSchema.put("properties", properties);
-        promptSchema.put("required", new String[]{"name"});
+        promptSchema.put("required", new String[]{"status"});
 
-        MCPPrompt greetingPrompt = new MCPPrompt(
-            "greeting",
-            "A simple greeting prompt",
-            "Hello, {{name}}! Welcome to the GitHub MCP server.",
+        MCPPrompt gitCommitHelperPrompt = new MCPPrompt(
+            "git-commit-helper",
+            "Generate a professional git commit message based on git status and diff",
+            "Generate a conventional and professional Git commit message based on the following git status:\n{{status}}\n\nAnd git diff:\n{{diff}}",
             promptSchema,
             null
         ) {
@@ -63,7 +68,7 @@ public class GitHub extends MCPServer {
             }
         };
 
-        this.registerPrompt(greetingPrompt);
+        this.registerPrompt(gitCommitHelperPrompt);
     }
 
     @Override

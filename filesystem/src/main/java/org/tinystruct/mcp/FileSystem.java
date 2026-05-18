@@ -26,23 +26,29 @@ public class FileSystem extends MCPServer {
         FileSystemTool fsTool = new FileSystemTool();
         this.registerTool(fsTool);
 
-        // Register a sample prompt (can be customized for FileSystem context)
+        // Register file-analyzer prompt for FileSystem context
         Builder promptSchema = new Builder();
         Builder properties = new Builder();
 
-        Builder nameParam = new Builder();
-        nameParam.put("type", "string");
-        nameParam.put("description", "The name to greet");
+        Builder pathParam = new Builder();
+        pathParam.put("type", "string");
+        pathParam.put("description", "The absolute path to the file or directory to analyze");
 
-        properties.put("name", nameParam);
+        Builder focusParam = new Builder();
+        focusParam.put("type", "string");
+        focusParam.put("description", "Specific aspect to focus on (e.g., errors, performance, code style)");
+
+        properties.put("path", pathParam);
+        properties.put("focus", focusParam);
+        
         promptSchema.put("type", "object");
         promptSchema.put("properties", properties);
-        promptSchema.put("required", new String[]{"name"});
+        promptSchema.put("required", new String[]{"path"});
 
-        MCPPrompt greetingPrompt = new MCPPrompt(
-            "greeting",
-            "A simple greeting prompt",
-            "Hello, {{name}}! Welcome to the FileSystem MCP server.",
+        MCPPrompt fileAnalyzerPrompt = new MCPPrompt(
+            "file-analyzer",
+            "Analyze file content or a directory listing for key insights",
+            "Please analyze the file or directory at {{path}} and provide a detailed summary of its structure, contents, and potential issues. Focus specifically on: {{focus}}.",
             promptSchema,
             null
         ) {
@@ -52,7 +58,7 @@ public class FileSystem extends MCPServer {
             }
         };
 
-        this.registerPrompt(greetingPrompt);
+        this.registerPrompt(fileAnalyzerPrompt);
     }
 
     @Override
