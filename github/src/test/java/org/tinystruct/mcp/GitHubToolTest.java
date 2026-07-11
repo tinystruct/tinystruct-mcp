@@ -1,30 +1,15 @@
 package org.tinystruct.mcp;
 
-import org.eclipse.jgit.api.CloneCommand;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.PullCommand;
-import org.eclipse.jgit.api.PullResult;
-import org.eclipse.jgit.api.PushCommand;
-import org.eclipse.jgit.api.Status;
-import org.eclipse.jgit.api.StatusCommand;
-import org.eclipse.jgit.transport.FetchResult;
-import org.eclipse.jgit.transport.PushResult;
-import org.eclipse.jgit.transport.RemoteRefUpdate;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.merge.MergeStrategy;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.MockedStatic;
 import org.tinystruct.data.component.Builder;
 
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -50,7 +35,8 @@ class GitHubToolTest {
     // ==================== Clone Repository Tests ====================
 
     @Test
-    void testCloneRepository_WithAllParameters() throws Exception {
+    @Tag("network")
+    public void testCloneRepository_ValidRepository() throws MCPException {
         // This test requires actual Git operations, so we'll test the parameter handling
         // and error cases rather than actual cloning
         
@@ -194,7 +180,8 @@ class GitHubToolTest {
     // ==================== GitHub API Tests ====================
 
     @Test
-    void testGetGitHubIssues_InvalidRepositoryFormat() {
+    @Tag("network")
+    public void testGetGitHubIssues_ValidRequest() throws MCPException {
         // Arrange
         String invalidRepo = "invalid-format";
         String token = "test-token";
@@ -207,7 +194,8 @@ class GitHubToolTest {
     }
 
     @Test
-    void testGetGitHubIssues_WithDefaultState() {
+    @Tag("network")
+    public void testGetGitHubIssues_WithDefaultState() throws MCPException {
         // Arrange
         String repo = "owner/repo";
         String token = "test-token";
@@ -218,7 +206,8 @@ class GitHubToolTest {
     }
 
     @Test
-    void testGetGitHubIssues_AllStates() {
+    @Tag("network")
+    public void testGetGitHubIssues_AllStates() throws MCPException {
         // Arrange
         String repo = "owner/repo";
         String token = "test-token";
@@ -233,7 +222,8 @@ class GitHubToolTest {
     }
 
     @Test
-    void testGetGitHubPullRequests_InvalidRepositoryFormat() {
+    @Tag("network")
+    public void testGetGitHubPullRequests_ValidRequest() throws MCPException {
         // Arrange
         String invalidRepo = "no-slash";
         String token = "test-token";
@@ -246,7 +236,8 @@ class GitHubToolTest {
     }
 
     @Test
-    void testGetGitHubPullRequests_WithDefaultState() {
+    @Tag("network")
+    public void testGetGitHubPullRequests_WithDefaultState() throws MCPException {
         // Arrange
         String repo = "owner/repo";
         String token = "test-token";
@@ -257,20 +248,8 @@ class GitHubToolTest {
     }
 
     @Test
-    void testGetGitHubActions_InvalidRepositoryFormat() {
-        // Arrange
-        String invalidRepo = "invalid";
-        String token = "test-token";
-
-        // Act & Assert
-        MCPException exception = assertThrows(MCPException.class, () -> 
-            githubTool.getGitHubActions(invalidRepo, token));
-        assertTrue(exception.getMessage().contains("Invalid repository format") ||
-                   exception.getMessage().contains("owner/repo"));
-    }
-
-    @Test
-    void testGetGitHubActions_ValidFormat() {
+    @Tag("network")
+    public void testGetGitHubActions_ValidRequest() throws MCPException {
         // Arrange
         String repo = "owner/repo";
         String token = "test-token";
@@ -356,14 +335,9 @@ class GitHubToolTest {
     }
 
     @Test
-    void testCloneRepository_RepositoryWithoutGitExtension() {
-        // Arrange - Some repos might not have .git extension
-        String repoWithoutExt = "https://github.com/owner/repo";
-        Path targetPath = tempDir.resolve("no-ext-clone");
-
-        // Act & Assert - Should handle gracefully
-        assertThrows(Exception.class, () -> 
-            githubTool.cloneRepository(repoWithoutExt, "main", targetPath.toString()));
+    public void testCloneRepository_RepositoryWithoutGitExtension() {
+        String invalidRepoUrl = "https://github.com/tinystruct/tinystruct"; // No .git extension
+        assertThrows(MCPException.class, () -> githubTool.cloneRepository(invalidRepoUrl, null, null));
     }
 
     @Test

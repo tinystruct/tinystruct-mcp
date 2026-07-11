@@ -6,6 +6,10 @@ import org.tinystruct.system.annotation.Action;
 import org.tinystruct.system.annotation.Argument;
 
 import java.io.File;
+import java.io.InputStreamReader;
+import java.io.BufferedReader;
+import java.net.URL;
+import java.net.HttpURLConnection;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.logging.Level;
@@ -21,13 +25,6 @@ public class GitHub extends MCPServer {
 
     // GitHub MCP specific constants
     private static final String GITHUB_PROTOCOL_VERSION = "1.0.0";
-    private static final String[] GITHUB_FEATURES = {
-            "base", "lifecycle", "resources", "tools", "github",
-            "git.clone", "git.pull", "git.push", "git.status",
-            "github.issues", "github.prs", "github.actions"
-    };
-    private static final String DEFAULT_CLONE_DIR = "cloned-repos";
-    private boolean initialized = false;
 
     @Override
     public void init() {
@@ -254,7 +251,13 @@ public class GitHub extends MCPServer {
                 finalTargetPath = Paths.get(targetPath);
             } else {
                 // Extract repository name from URL for the target directory
-                String repoName = repository.substring(repository.lastIndexOf('/') + 1, repository.lastIndexOf(".git"));
+                int dotGitIndex = repository.lastIndexOf(".git");
+                String repoName;
+                if (dotGitIndex != -1) {
+                    repoName = repository.substring(repository.lastIndexOf('/') + 1, dotGitIndex);
+                } else {
+                    repoName = repository.substring(repository.lastIndexOf('/') + 1);
+                }
                 finalTargetPath = Paths.get(DEFAULT_CLONE_DIR, repoName);
             }
 
@@ -271,14 +274,13 @@ public class GitHub extends MCPServer {
             }
 
             // Clone the repository
-            Git result = Git.cloneRepository()
+            try (Git result = Git.cloneRepository()
                     .setURI(repository)
                     .setBranch(branch)
                     .setDirectory(targetDir)
-                    .call();
-
-            LOGGER.info("Successfully cloned " + repository + " to " + finalTargetPath);
-            result.close();
+                    .call()) {
+                LOGGER.info("Successfully cloned " + repository + " to " + finalTargetPath);
+            }
 
             // Prepare success response
             Builder responseResult = new Builder();
@@ -296,29 +298,28 @@ public class GitHub extends MCPServer {
                 throw new MCPException("Not a valid git repository: " + repositoryPath);
             }
 
-            Git git = Git.open(gitDir);
+            try (Git git = Git.open(gitDir)) {
+                // Configure pull command
+                org.eclipse.jgit.api.PullCommand pullCmd = git.pull();
 
-            // Configure pull command
-            org.eclipse.jgit.api.PullCommand pullCmd = git.pull();
+                // Set branch if specified
+                if (branch != null && !branch.isEmpty()) {
+                    pullCmd.setRemoteBranchName(branch);
+                }
 
-            // Set branch if specified
-            if (branch != null && !branch.isEmpty()) {
-                pullCmd.setRemoteBranchName(branch);
+                // Execute pull
+                org.eclipse.jgit.api.PullResult result = pullCmd.call();
+
+                // Prepare success response
+                Builder responseResult = new Builder();
+                responseResult.put("status", "success");
+                responseResult.put("repository_path", repositoryPath);
+                responseResult.put("updated", result.isSuccessful());
+                responseResult.put("fetch_result", result.getFetchResult().getMessages());
+                responseResult.put("merge_result", result.getMergeResult().getMergeStatus().name());
+
+                return responseResult;
             }
-
-            // Execute pull
-            org.eclipse.jgit.api.PullResult result = pullCmd.call();
-            git.close();
-
-            // Prepare success response
-            Builder responseResult = new Builder();
-            responseResult.put("status", "success");
-            responseResult.put("repository_path", repositoryPath);
-            responseResult.put("updated", result.isSuccessful());
-            responseResult.put("fetch_result", result.getFetchResult().getMessages());
-            responseResult.put("merge_result", result.getMergeResult().getMergeStatus().name());
-
-            return responseResult;
         }
 
         private Builder pushRepositoryInternal(String repositoryPath, String remote, String branch) throws Exception {
@@ -327,17 +328,16 @@ public class GitHub extends MCPServer {
                 throw new MCPException("Not a valid git repository: " + repositoryPath);
             }
 
-            Git git = Git.open(gitDir);
-
-            // Configure and execute push command
-            org.eclipse.jgit.transport.PushResult result = git.push()
-                    .setRemote(remote)
-                    .setRefSpecs(new org.eclipse.jgit.transport.RefSpec(branch))
-                    .call()
-                    .iterator()
-                    .next();
-
-            git.close();
+            org.eclipse.jgit.transport.PushResult result;
+            try (Git git = Git.open(gitDir)) {
+                // Configure and execute push command
+                result = git.push()
+                        .setRemote(remote)
+                        .setRefSpecs(new org.eclipse.jgit.transport.RefSpec(branch))
+                        .call()
+                        .iterator()
+                        .next();
+            }
 
             // Check for errors in the push result
             boolean success = true;
@@ -353,13 +353,14 @@ public class GitHub extends MCPServer {
 
             // Prepare response
             Builder responseResult = new Builder();
-            responseResult.put("status", success ? "success" : "error");
+            responseResult.put("status", "success");
             responseResult.put("repository_path", repositoryPath);
             responseResult.put("pushed", success);
             responseResult.put("remote", remote);
             responseResult.put("branch", branch);
 
             if (!success) {
+                responseResult.put("status", "error");
                 responseResult.put("messages", messages.toString());
             }
 
@@ -372,11 +373,11 @@ public class GitHub extends MCPServer {
                 throw new MCPException("Not a valid git repository: " + repositoryPath);
             }
 
-            Git git = Git.open(gitDir);
-
-            // Get status
-            org.eclipse.jgit.api.Status status = git.status().call();
-            git.close();
+            org.eclipse.jgit.api.Status status;
+            try (Git git = Git.open(gitDir)) {
+                // Get status
+                status = git.status().call();
+            }
 
             boolean isClean = status.isClean();
 
@@ -449,51 +450,18 @@ public class GitHub extends MCPServer {
                 if (repoParts.length != 2) {
                     throw new MCPException("Invalid repository format. Expected 'owner/repo'");
                 }
-
-                String owner = repoParts[0];
-                String repo = repoParts[1];
-
-                // Create GitHub API URL
-                String apiUrl = getGitHubApiUrl(owner, repo, "issues?state=" + state);
-
-                // Make HTTP request to GitHub API
-                java.net.URL url = new java.net.URL(apiUrl);
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
-                conn.setRequestProperty("Authorization", "token " + token);
-
-                int responseCode = conn.getResponseCode();
-                LOGGER.info("GitHub API response code: " + responseCode);
-
-                if (responseCode == 200) {
-                    // Read response
-                    java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
-                    String inputLine;
-                    StringBuilder content = new StringBuilder();
-                    while ((inputLine = in.readLine()) != null) {
-                        content.append(inputLine);
-                    }
-                    in.close();
-
-                    // Parse JSON response
-                    Builder issuesJson = new Builder();
-                    issuesJson.parse(content.toString());
-
-                    // Create response
-                    Builder result = new Builder();
-                    result.put("status", "success");
-                    result.put("repository", repository);
-                    result.put("total", issuesJson.size());
-                    result.put("issues", issuesJson);
-
-                    LOGGER.info("Successfully fetched " + issuesJson.size() + " issues for " + repository);
-                    return result;
-                } else {
-                    // Handle error
-                    throw new MCPException("GitHub API error: " + responseCode);
-                }
-
+                
+                String apiUrl = getGitHubApiUrl(repoParts[0], repoParts[1], "issues?state=" + state);
+                Builder issuesJson = fetchGitHubApiJson(apiUrl, token);
+                
+                Builder result = new Builder();
+                result.put("status", "success");
+                result.put("repository", repository);
+                result.put("total", issuesJson.size());
+                result.put("issues", issuesJson);
+                
+                LOGGER.info("Successfully fetched " + issuesJson.size() + " issues for " + repository);
+                return result;
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Failed to fetch GitHub issues: " + e.getMessage(), e);
                 throw new MCPException("Failed to fetch GitHub issues: " + e.getMessage());
@@ -507,51 +475,18 @@ public class GitHub extends MCPServer {
                 if (repoParts.length != 2) {
                     throw new MCPException("Invalid repository format. Expected 'owner/repo'");
                 }
-
-                String owner = repoParts[0];
-                String repo = repoParts[1];
-
-                // Create GitHub API URL for pull requests
-                String apiUrl = getGitHubApiUrl(owner, repo, "pulls?state=" + state);
-
-                // Make HTTP request to GitHub API
-                java.net.URL url = new java.net.URL(apiUrl);
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
-                conn.setRequestProperty("Authorization", "token " + token);
-
-                int responseCode = conn.getResponseCode();
-                LOGGER.info("GitHub API response code: " + responseCode);
-
-                if (responseCode == 200) {
-                    // Read response
-                    java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
-                    String inputLine;
-                    StringBuilder content = new StringBuilder();
-                    while ((inputLine = in.readLine()) != null) {
-                        content.append(inputLine);
-                    }
-                    in.close();
-
-                    // Parse JSON response
-                    Builder prsJson = new Builder();
-                    prsJson.parse(content.toString());
-
-                    // Create response
-                    Builder result = new Builder();
-                    result.put("status", "success");
-                    result.put("repository", repository);
-                    result.put("total", prsJson.size());
-                    result.put("pull_requests", prsJson);
-
-                    LOGGER.info("Successfully fetched " + prsJson.size() + " pull requests for " + repository);
-                    return result;
-                } else {
-                    // Handle error
-                    throw new MCPException("GitHub API error: " + responseCode);
-                }
-
+                
+                String apiUrl = getGitHubApiUrl(repoParts[0], repoParts[1], "pulls?state=" + state);
+                Builder prsJson = fetchGitHubApiJson(apiUrl, token);
+                
+                Builder result = new Builder();
+                result.put("status", "success");
+                result.put("repository", repository);
+                result.put("total", prsJson.size());
+                result.put("pull_requests", prsJson);
+                
+                LOGGER.info("Successfully fetched " + prsJson.size() + " pull requests for " + repository);
+                return result;
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Failed to fetch GitHub pull requests: " + e.getMessage(), e);
                 throw new MCPException("Failed to fetch GitHub pull requests: " + e.getMessage());
@@ -565,58 +500,50 @@ public class GitHub extends MCPServer {
                 if (repoParts.length != 2) {
                     throw new MCPException("Invalid repository format. Expected 'owner/repo'");
                 }
-
-                String owner = repoParts[0];
-                String repo = repoParts[1];
-
-                // Create GitHub API URL for workflows
-                String apiUrl = getGitHubApiUrl(owner, repo, "actions/workflows");
-
-                // Make HTTP request to GitHub API
-                java.net.URL url = new java.net.URL(apiUrl);
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
-                conn.setRequestProperty("Authorization", "token " + token);
-
-                int responseCode = conn.getResponseCode();
-                LOGGER.info("GitHub API response code: " + responseCode);
-
-                if (responseCode == 200) {
-                    // Read response
-                    java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
-                    String inputLine;
-                    StringBuilder content = new StringBuilder();
-                    while ((inputLine = in.readLine()) != null) {
-                        content.append(inputLine);
-                    }
-                    in.close();
-
-                    // Parse JSON response
-                    Builder workflowsJson = new Builder();
-                    workflowsJson.parse(content.toString());
-
-                    // Extract workflows array if present
-                    Builder workflows = workflowsJson.containsKey("workflows") ?
-                        (Builder) workflowsJson.get("workflows") : workflowsJson;
-
-                    // Create response
-                    Builder result = new Builder();
-                    result.put("status", "success");
-                    result.put("repository", repository);
-                    result.put("total", workflows.size());
-                    result.put("workflows", workflows);
-
-                    LOGGER.info("Successfully fetched GitHub Actions workflows for " + repository);
-                    return result;
-                } else {
-                    // Handle error
-                    throw new MCPException("GitHub API error: " + responseCode);
-                }
-
+                
+                String apiUrl = getGitHubApiUrl(repoParts[0], repoParts[1], "actions/workflows");
+                Builder workflowsJson = fetchGitHubApiJson(apiUrl, token);
+                
+                Builder workflows = workflowsJson.containsKey("workflows") ?
+                    (Builder) workflowsJson.get("workflows") : workflowsJson;
+                
+                Builder result = new Builder();
+                result.put("status", "success");
+                result.put("repository", repository);
+                result.put("total", workflows.size());
+                result.put("workflows", workflows);
+                
+                LOGGER.info("Successfully fetched GitHub Actions workflows for " + repository);
+                return result;
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Failed to fetch GitHub Actions workflows: " + e.getMessage(), e);
                 throw new MCPException("Failed to fetch GitHub Actions workflows: " + e.getMessage());
+            }
+        }
+
+        private Builder fetchGitHubApiJson(String apiUrl, String token) throws Exception {
+            URL url = new URL(apiUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+            conn.setRequestProperty("Authorization", "token " + token);
+
+            int responseCode = conn.getResponseCode();
+            LOGGER.info("GitHub API response code: " + responseCode);
+
+            if (responseCode == 200) {
+                StringBuilder content = new StringBuilder();
+                try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                    String inputLine;
+                    while ((inputLine = in.readLine()) != null) {
+                        content.append(inputLine);
+                    }
+                }
+                Builder json = new Builder();
+                json.parse(content.toString());
+                return json;
+            } else {
+                throw new MCPException("GitHub API error: " + responseCode);
             }
         }
         /**

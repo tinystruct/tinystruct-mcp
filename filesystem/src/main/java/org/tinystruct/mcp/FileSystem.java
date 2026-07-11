@@ -13,6 +13,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 // Reference: see GitHub.java and SampleMCPServerApplication.java for the modern MCPServerApplication pattern
+/**
+ * FileSystem MCP Server
+ * Provides tools for reading, writing, and managing files and directories.
+ */
 public class FileSystem extends MCPServer {
 
     // FileSystem MCP specific constants
@@ -388,7 +392,7 @@ public class FileSystem extends MCPServer {
                     content = Base64.getEncoder().encodeToString(fileContent);
                 } else {
                     // Default to UTF-8
-                    content = new String(fileContent, "UTF-8");
+                    content = new String(fileContent, java.nio.charset.StandardCharsets.UTF_8);
                 }
 
                 Builder result = new Builder();
@@ -421,7 +425,7 @@ public class FileSystem extends MCPServer {
                     data = Base64.getDecoder().decode(content);
                 } else {
                     // Default to UTF-8
-                    data = content.getBytes("UTF-8");
+                    data = content.getBytes(java.nio.charset.StandardCharsets.UTF_8);
                 }
 
                 // Write the file
@@ -595,15 +599,19 @@ public class FileSystem extends MCPServer {
         }
 
         private boolean deleteRecursively(File file) {
+            if (!file.exists()) {
+                return true;
+            }
+            boolean success = true;
             if (file.isDirectory()) {
-                File[] files = file.listFiles();
-                if (files != null) {
-                    for (File child : files) {
-                        deleteRecursively(child);
+                File[] children = file.listFiles();
+                if (children != null) {
+                    for (File child : children) {
+                        success &= deleteRecursively(child);
                     }
                 }
             }
-            return file.delete();
+            return success && file.delete();
         }
     }
 }
