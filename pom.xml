@@ -12,6 +12,7 @@
         <module>github</module>
         <module>filesystem</module>
         <module>database</module>
+        <module>websearch</module>
     </modules>
     <url>https://www.tinystruct.org</url>
 
