@@ -1,4 +1,4 @@
-﻿# tinystruct MCP project
+# tinystruct MCP project
 
 **tinystruct MCP** is a demonstration project that showcases how to develop [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tools using the [tinystruct framework](https://www.tinystruct.org). It provides a modular Java-based MCP server with built-in tools for file system management and GitHub operations.
 
@@ -22,6 +22,8 @@ The project is organized into submodules, each representing a specific domain of
 
 *   **`github/`**: Implements Git operations (clone, pull, push, status) and GitHub API integrations (issues, PRs, actions).
 *   **`filesystem/`**: Provides comprehensive local file system management (read, write, copy, move, delete, list).
+*   **`database/`**: Provides database connectivity and operations (query, insert, update, delete, describe).
+*   **`websearch/`**: Provides web search capabilities using DuckDuckGo Instant Answer API.
 *   **`bin/`**: Contains scripts for server management and dispatching commands.
 
 ---
@@ -53,10 +55,10 @@ Use the `bin/dispatcher` (for Linux/macOS) or `bin/dispatcher.cmd` (for Windows)
 
 ```sh
 # On Linux / macOS
-bin/dispatcher start --import org.tinystruct.system.HttpServer --import org.tinystruct.mcp.GitHub --import org.tinystruct.mcp.FileSystem --server-port 777
+bin/dispatcher start --import org.tinystruct.system.HttpServer --import org.tinystruct.mcp.GitHub --import org.tinystruct.mcp.FileSystem --import org.tinystruct.mcp.Database --import org.tinystruct.mcp.websearch.WebSearch --server-port 777
 
 # On Windows
-bin\dispatcher.cmd start --import org.tinystruct.system.HttpServer --import org.tinystruct.mcp.GitHub --import org.tinystruct.mcp.FileSystem --server-port 777
+bin\dispatcher.cmd start --import org.tinystruct.system.HttpServer --import org.tinystruct.mcp.GitHub --import org.tinystruct.mcp.FileSystem --import org.tinystruct.mcp.Database --import org.tinystruct.mcp.websearch.WebSearch --server-port 777
 ```
 
 #### Programmatic Startup (Java)
@@ -70,6 +72,8 @@ import org.tinystruct.system.ApplicationManager;
 import org.tinystruct.system.HttpServer;
 import org.tinystruct.mcp.GitHub;
 import org.tinystruct.mcp.FileSystem;
+import org.tinystruct.mcp.Database;
+import org.tinystruct.mcp.websearch.WebSearch;
 
 public class Main {
     public static void main(String[] args) {
@@ -79,6 +83,8 @@ public class Main {
         ApplicationManager.init();
         ApplicationManager.install(new GitHub());
         ApplicationManager.install(new FileSystem());
+        ApplicationManager.install(new Database());
+        ApplicationManager.install(new WebSearch());
         ApplicationManager.install(new HttpServer());
         
         ApplicationManager.call("start", ctx);
@@ -113,6 +119,22 @@ public class Main {
 | `filesystem/move` | Move or rename a file or directory |
 | `filesystem/delete` | Delete a file or directory (recursive support) |
 | `filesystem/mkdir` | Create a new directory |
+
+### Database Tool (`database/`)
+| Action | Description |
+| :--- | :--- |
+| `db/list-tables` | List all tables in the connected database |
+| `db/describe` | Describe the columns and types of a specific table |
+| `db/query` | SELECT rows from a table with optional WHERE and LIMIT |
+| `db/insert` | INSERT a row into a table |
+| `db/update` | UPDATE rows in a table matching a WHERE clause |
+| `db/delete` | DELETE rows from a table matching a WHERE clause |
+| `db/execute` | Execute arbitrary SQL |
+
+### WebSearch Tool (`websearch/`)
+| Action | Description |
+| :--- | :--- |
+| `websearch/search` | Perform a web search using DuckDuckGo Instant Answer API |
 
 ---
 
